@@ -1448,10 +1448,9 @@ a {
 
   .chart-card__meta {
     min-height: 0;
-    display: grid;
-    grid-template-columns: repeat(3, max-content);
-    justify-content: space-between;
-    gap: 9px 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 9px 12px;
     padding: 10px 12px;
     overflow: visible;
     white-space: normal;
@@ -1463,8 +1462,10 @@ a {
   }
 
   .chart-label-toggle {
-    grid-column: 1 / -1;
-    justify-self: start;
+    margin-left: auto;
+  }
+
+  .chart-label-toggle.is-wrapped {
     margin-left: 0;
   }
 

@@ -629,6 +629,7 @@ export function ModelExplorer({ initialCatalog }: ModelExplorerProps) {
   const initialSelected = pickDefaultModel(initialCatalog.models);
   const { preference, resolvedTheme, setPreference } = useThemePreference();
   const { locale, setLocale, t } = useLocale();
+  const chartMetaRef = useRef<HTMLDivElement>(null);
   const [selectedId, setSelectedId] = useState<string | null>(
     initialSelected?.id ?? null,
   );
@@ -639,6 +640,39 @@ export function ModelExplorer({ initialCatalog }: ModelExplorerProps) {
   const [hoveredAlternativeId, setHoveredAlternativeId] = useState<string | null>(
     null,
   );
+  const [isChartLabelToggleWrapped, setIsChartLabelToggleWrapped] =
+    useState(false);
+
+  useEffect(() => {
+    const meta = chartMetaRef.current;
+    if (!meta) return;
+
+    const firstLegend = meta.firstElementChild;
+    const labelToggle = meta.querySelector<HTMLButtonElement>(
+      ".chart-label-toggle",
+    );
+    if (!(firstLegend instanceof HTMLElement) || !labelToggle) return;
+
+    const updateWrapState = () => {
+      const isWrapped = labelToggle.offsetTop > firstLegend.offsetTop;
+      setIsChartLabelToggleWrapped((current) =>
+        current === isWrapped ? current : isWrapped,
+      );
+    };
+
+    updateWrapState();
+    const observer =
+      typeof ResizeObserver === "function"
+        ? new ResizeObserver(updateWrapState)
+        : null;
+    observer?.observe(meta);
+    window.addEventListener("resize", updateWrapState);
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", updateWrapState);
+    };
+  }, [locale]);
 
   const selected = getSelectedModel(catalog, selectedId);
   const selectedIsComparable = selected !== null && isChartableModel(selected);
@@ -817,7 +851,7 @@ export function ModelExplorer({ initialCatalog }: ModelExplorerProps) {
 
         <div className="analysis-grid">
           <section className="chart-card" aria-label={t("chart.areaLabel")}>
-            <div className="chart-card__meta">
+            <div className="chart-card__meta" ref={chartMetaRef}>
               <div>
                 <span className="chart-key chart-key--frontier" />
                 {t("chart.frontier")}
@@ -832,7 +866,7 @@ export function ModelExplorer({ initialCatalog }: ModelExplorerProps) {
               </div>
               <button
                 type="button"
-                className={`chart-label-toggle ${showAllLabels ? "is-active" : ""}`}
+                className={`chart-label-toggle ${showAllLabels ? "is-active" : ""} ${isChartLabelToggleWrapped ? "is-wrapped" : ""}`}
                 aria-pressed={showAllLabels}
                 onClick={() => setShowAllLabels((current) => !current)}
               >
