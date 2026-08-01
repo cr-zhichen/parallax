@@ -1,13 +1,10 @@
-name: Docker
+name: Docker Image CI
 
+# 仅在 GitHub Release 发布时构建并推送镜像。
 on:
-  push:
-    branches:
-      - main
-    tags:
-      - "v*.*.*"
-  pull_request:
-  workflow_dispatch:
+  release:
+    types:
+      - published
 
 permissions:
   contents: read
@@ -16,14 +13,17 @@ permissions:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  IMAGE_TAG: ${{ github.event.release.tag_name }}
 
 jobs:
-  build-and-publish:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check out repository
+      - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -42,47 +42,56 @@ jobs:
       - name: Run checks
         run: pnpm check
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Log in to GitHub Container Registry
-        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract Docker metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=tag
-            type=ref,event=pr
-            type=sha,prefix=sha-,format=short
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build Docker image with CI Compose
+      - name: Build with Docker Compose
         env:
-          PARALLAX_CI_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:build-${{ github.sha }}
+          PARALLAX_CI_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
         run: docker compose -f docker-compose.ci.yml build --pull parallax
 
-      - name: Publish Docker image tags
-        if: github.event_name != 'pull_request'
-        env:
-          PARALLAX_CI_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:build-${{ github.sha }}
-          DOCKER_TAGS: ${{ steps.meta.outputs.tags }}
+      - name: Determine floating tag
+        id: floating
         run: |
-          set -euo pipefail
+          ref="$IMAGE_TAG"
 
-          while IFS= read -r tag; do
-            if [ -z "$tag" ]; then
-              continue
-            fi
+          if [[ "$ref" != *-* ]]; then
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
-            docker tag "$PARALLAX_CI_IMAGE" "$tag"
-            docker push "$tag"
-          done <<< "$DOCKER_TAGS"
+          suffix="${ref#*-}"
+          channel=$(printf '%s' "$suffix" | sed -E 's/^([[:alpha:]]+).*/\1/' | tr '[:upper:]' '[:lower:]')
+          case "$channel" in
+            rc|beta|alpha)
+              echo "tag=$channel" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "tag=" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
+      - name: Push release image
+        env:
+          PARALLAX_CI_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+        run: docker compose -f docker-compose.ci.yml push parallax
+
+      - name: Tag image with floating tag
+        if: steps.floating.outputs.tag != ''
+        env:
+          RELEASE_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          FLOATING_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.floating.outputs.tag }}
+        run: docker tag "$RELEASE_IMAGE" "$FLOATING_IMAGE"
+
+      - name: Push floating tag
+        if: steps.floating.outputs.tag != ''
+        env:
+          FLOATING_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.floating.outputs.tag }}
+        run: docker push "$FLOATING_IMAGE"

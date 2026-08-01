@@ -99,7 +99,7 @@ echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_USERNAME" --password-std
 docker compose -f docker-compose.ci.yml build parallax
 ```
 
-发布流水线见 [.github/workflows/docker-publish.yml](.github/workflows/docker-publish.yml)，会在 `main` 分支和 `v*.*.*` 标签上执行检查并发布镜像。
+发布流水线见 [.github/workflows/docker-publish.yml](.github/workflows/docker-publish.yml)，仅在 GitHub Release 发布时执行检查并发布镜像。Release 的标签会作为版本镜像标签；稳定版本（如 `v1.0.0`）额外更新 `latest`，`-rc`、`-beta` 和 `-alpha` 版本分别更新对应的浮动标签。
 
 ## API
 

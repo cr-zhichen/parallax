@@ -161,6 +161,29 @@ a {
   gap: 4px;
 }
 
+.github-link {
+  width: 34px;
+  height: 34px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 4px;
+  color: var(--ink-soft);
+  text-decoration: none;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.github-link:hover,
+.github-link:focus-visible {
+  background: var(--surface-soft);
+  color: var(--ink);
+}
+
+.github-link__icon {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
 .locale-switcher {
   position: relative;
   display: inline-flex;
