@@ -1,0 +1,31 @@
+[tools]
+node = "24.16.0"
+pnpm = "11.5.2"
+
+[tasks.install]
+description = "Install project dependencies"
+run = "pnpm install"
+
+[tasks.dev]
+description = "Start the Next.js development server"
+run = "pnpm dev"
+
+[tasks.lint]
+description = "Run ESLint"
+run = "pnpm lint"
+
+[tasks.test]
+description = "Run unit tests"
+run = "pnpm test"
+
+[tasks.build]
+description = "Build the production application"
+run = "pnpm build"
+
+[tasks.check]
+description = "Run lint, tests, and the production build"
+depends = ["lint", "test", "build"]
+
+[tasks.start]
+description = "Start the production server"
+run = "pnpm start"

@@ -1,0 +1,6 @@
+services:
+  parallax:
+    image: ${PARALLAX_CI_IMAGE:-ghcr.io/cr-zhichen/parallax:ci}
+    build:
+      context: .
+      dockerfile: Dockerfile
