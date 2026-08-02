@@ -1134,7 +1134,7 @@ a {
   letter-spacing: 0.02em;
 }
 
-.chart-card__meta > div {
+.chart-card__meta > div:not(.chart-card__actions) {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -1146,7 +1146,6 @@ a {
   flex: 0 0 auto;
   align-items: center;
   gap: 7px;
-  margin-left: auto;
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -1156,6 +1155,15 @@ a {
   font-size: 10px;
   font-weight: 650;
   transition: color 140ms ease;
+}
+
+.chart-card__actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 19px;
+  margin-left: auto;
+  white-space: nowrap;
 }
 
 .chart-scale-toggle {
@@ -1850,16 +1858,16 @@ a {
     white-space: normal;
   }
 
-  .chart-card__meta > div {
+  .chart-card__meta > div:not(.chart-card__actions) {
     gap: 5px;
     white-space: nowrap;
   }
 
-  .chart-label-toggle {
+  .chart-card__actions {
     margin-left: auto;
   }
 
-  .chart-label-toggle.is-wrapped {
+  .chart-card__actions.is-wrapped {
     margin-left: 0;
   }
 

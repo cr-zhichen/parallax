@@ -903,7 +903,7 @@ export function ModelExplorer({ initialCatalog }: ModelExplorerProps) {
   const [hoveredAlternativeId, setHoveredAlternativeId] = useState<string | null>(
     null,
   );
-  const [isChartLabelToggleWrapped, setIsChartLabelToggleWrapped] =
+  const [isChartActionsWrapped, setIsChartActionsWrapped] =
     useState(false);
 
   const handleSelectModel = (id: string) => {
@@ -921,14 +921,12 @@ export function ModelExplorer({ initialCatalog }: ModelExplorerProps) {
     if (!meta) return;
 
     const firstLegend = meta.firstElementChild;
-    const labelToggle = meta.querySelector<HTMLButtonElement>(
-      ".chart-label-toggle",
-    );
-    if (!(firstLegend instanceof HTMLElement) || !labelToggle) return;
+    const actions = meta.querySelector<HTMLElement>(".chart-card__actions");
+    if (!(firstLegend instanceof HTMLElement) || !actions) return;
 
     const updateWrapState = () => {
-      const isWrapped = labelToggle.offsetTop > firstLegend.offsetTop;
-      setIsChartLabelToggleWrapped((current) =>
+      const isWrapped = actions.offsetTop > firstLegend.offsetTop;
+      setIsChartActionsWrapped((current) =>
         current === isWrapped ? current : isWrapped,
       );
     };
@@ -1179,34 +1177,38 @@ export function ModelExplorer({ initialCatalog }: ModelExplorerProps) {
                 <span className="chart-key chart-key--reasoning" />
                 {t("chart.reasoningLevels")}
               </div>
-              <button
-                type="button"
-                className={`chart-label-toggle ${showAllLabels ? "is-active" : ""} ${isChartLabelToggleWrapped ? "is-wrapped" : ""}`}
-                aria-pressed={showAllLabels}
-                onClick={() => setShowAllLabels((current) => !current)}
+              <div
+                className={`chart-card__actions ${isChartActionsWrapped ? "is-wrapped" : ""}`}
               >
-                <span aria-hidden="true" />
-                {t("chart.showAllLabels")}
-              </button>
-              <button
-                type="button"
-                className={`chart-scale-toggle ${xAxisScale === "log" ? "is-active" : ""}`}
-                aria-pressed={xAxisScale === "log"}
-                aria-label={t("chart.xScale.toggleAria", {
-                  current: xAxisScaleLabel,
-                })}
-                title={t("chart.xScale.toggleTitle", {
-                  current: xAxisScaleLabel,
-                })}
-                onClick={() =>
-                  setXAxisScale((current) =>
-                    current === "log" ? "linear" : "log",
-                  )
-                }
-              >
-                <span aria-hidden="true" />
-                {xAxisScaleLabel}
-              </button>
+                <button
+                  type="button"
+                  className={`chart-label-toggle ${showAllLabels ? "is-active" : ""}`}
+                  aria-pressed={showAllLabels}
+                  onClick={() => setShowAllLabels((current) => !current)}
+                >
+                  <span aria-hidden="true" />
+                  {t("chart.showAllLabels")}
+                </button>
+                <button
+                  type="button"
+                  className={`chart-scale-toggle ${xAxisScale === "log" ? "is-active" : ""}`}
+                  aria-pressed={xAxisScale === "log"}
+                  aria-label={t("chart.xScale.toggleAria", {
+                    current: xAxisScaleLabel,
+                  })}
+                  title={t("chart.xScale.toggleTitle", {
+                    current: xAxisScaleLabel,
+                  })}
+                  onClick={() =>
+                    setXAxisScale((current) =>
+                      current === "log" ? "linear" : "log",
+                    )
+                  }
+                >
+                  <span aria-hidden="true" />
+                  {xAxisScaleLabel}
+                </button>
+              </div>
             </div>
             <ModelScatterPlot
               models={chartModels}
