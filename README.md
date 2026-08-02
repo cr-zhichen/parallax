@@ -78,6 +78,7 @@ docker compose up -d
 ```
 
 模型目录快照保存在宿主机的 `./data/model-catalog.json`，通过目录映射挂载到容器；不要使用 `docker compose down -v`，否则会删除其他 Docker 卷（快照目录本身不会被该命令删除）。
+Compose 会先启动一次性的 root 权限初始化容器，将 `./data` 调整为镜像内 `nextjs` 用户（`1001:1001`）可写；初始化成功后才启动 Parallax，业务进程仍保持非 root。若初始化失败，业务服务不会继续启动。
 
 打开 <http://localhost:3000>，健康检查地址为 <http://localhost:3000/api/health>。停止服务：
 

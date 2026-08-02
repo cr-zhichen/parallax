@@ -1,8 +1,24 @@
 services:
+  fix-data-perms:
+    image: alpine:3.21
+    user: "0:0"
+    volumes:
+      - ./data:/data
+    command:
+      - sh
+      - -ec
+      - |
+        mkdir -p /data
+        chown -R 1001:1001 /data
+    restart: "no"
+
   parallax:
     image: ${PARALLAX_IMAGE:-ghcr.io/cr-zhichen/parallax:latest}
     ports:
       - "${PARALLAX_PORT:-3000}:3000"
+    depends_on:
+      fix-data-perms:
+        condition: service_completed_successfully
     environment:
       NODE_ENV: production
       ARTIFICIAL_ANALYSIS_API_KEY: ${ARTIFICIAL_ANALYSIS_API_KEY:-}
