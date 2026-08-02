@@ -16,6 +16,24 @@ const themeBootstrapScript = `
 
 const localeBootstrapScript = `
 (() => {
+  const supported = new Set(["zh-CN", "zh-TW", "en", "ja", "ko"]);
+
+  const matchLocale = (normalized) => {
+    if (
+      normalized === "zh-tw" ||
+      normalized === "zh-hk" ||
+      normalized === "zh-mo" ||
+      normalized.includes("hant")
+    ) {
+      return "zh-TW";
+    }
+    if (normalized === "zh" || normalized.startsWith("zh-")) return "zh-CN";
+    if (normalized === "en" || normalized.startsWith("en-")) return "en";
+    if (normalized === "ja" || normalized.startsWith("ja-")) return "ja";
+    if (normalized === "ko" || normalized.startsWith("ko-")) return "ko";
+    return null;
+  };
+
   const detectLocale = () => {
     const languages =
       Array.isArray(navigator.languages) && navigator.languages.length > 0
@@ -26,9 +44,8 @@ const localeBootstrapScript = `
 
     for (const language of languages) {
       const normalized = String(language).trim().toLowerCase().replace(/_/g, "-");
-      if (normalized === "zh" || normalized.startsWith("zh-")) return "zh-CN";
-      if (normalized === "en" || normalized.startsWith("en-")) return "en";
-      if (normalized === "ja" || normalized.startsWith("ja-")) return "ja";
+      const matched = matchLocale(normalized);
+      if (matched) return matched;
     }
 
     return "zh-CN";
@@ -36,10 +53,7 @@ const localeBootstrapScript = `
 
   try {
     const stored = window.localStorage.getItem("parallax-locale");
-    const locale =
-      stored === "en" || stored === "ja" || stored === "zh-CN"
-        ? stored
-        : detectLocale();
+    const locale = supported.has(stored) ? stored : detectLocale();
     document.documentElement.lang = locale;
   } catch {
     document.documentElement.lang = detectLocale();
