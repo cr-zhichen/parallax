@@ -762,10 +762,6 @@ a {
   margin-bottom: var(--explorer-row-gap);
 }
 
-.recommendations__heading .section-index {
-  margin-bottom: 3px;
-}
-
 .recommendations__heading h3 {
   margin: 0;
   color: var(--ink);
@@ -777,7 +773,8 @@ a {
 }
 
 .recommendations__heading > div {
-  width: 100%;
+  width: auto;
+  flex: 1 1 auto;
   min-width: 0;
 }
 
@@ -798,11 +795,19 @@ a {
   white-space: nowrap;
 }
 
+.recommendations__subtitle {
+  margin: 8px 0 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
 .recommendations__formula-hint {
   width: 16px;
   height: 16px;
   display: inline-grid;
   flex: 0 0 16px;
+  position: relative;
   place-items: center;
   border: 1px solid var(--accent-border);
   border-radius: 50%;
@@ -1151,7 +1156,25 @@ a {
   transition: color 140ms ease;
 }
 
-.chart-label-toggle > span {
+.chart-scale-toggle {
+  min-height: 26px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 650;
+  transition: color 140ms ease;
+}
+
+.chart-label-toggle > span,
+.chart-scale-toggle > span {
   width: 11px;
   height: 11px;
   border: 1px solid var(--line-strong);
@@ -1161,11 +1184,14 @@ a {
 }
 
 .chart-label-toggle:hover,
-.chart-label-toggle.is-active {
+.chart-label-toggle.is-active,
+.chart-scale-toggle:hover,
+.chart-scale-toggle.is-active {
   color: var(--ink);
 }
 
-.chart-label-toggle.is-active > span {
+.chart-label-toggle.is-active > span,
+.chart-scale-toggle.is-active > span {
   border-color: var(--accent);
   background: var(--accent);
   box-shadow: inset 0 0 0 2px var(--accent-soft);
@@ -1718,9 +1744,9 @@ a {
   }
 
   .recommendations__heading {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 9px;
+    align-items: flex-end;
+    flex-direction: row;
+    gap: 16px;
   }
 
 }

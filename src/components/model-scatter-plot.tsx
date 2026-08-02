@@ -102,6 +102,7 @@ interface ModelScatterPlotProps {
   alternativeIds: Set<string>;
   activeCreators: ReadonlySet<string>;
   showAllLabels: boolean;
+  xAxisScale: "log" | "linear";
   theme: "light" | "dark";
   locale: Locale;
   onSelect: (id: string) => void;
@@ -301,8 +302,12 @@ function renderChartTooltipLines(lines: string[]): string {
     .join("");
 }
 
-function toLogCost(value: number): number {
-  return Math.log10(value);
+function toChartCost(value: number, xAxisScale: "log" | "linear"): number {
+  return xAxisScale === "log" ? Math.log10(value) : value;
+}
+
+function fromChartCost(value: number, xAxisScale: "log" | "linear"): number {
+  return xAxisScale === "log" ? 10 ** value : value;
 }
 
 function toEChartsSymbol(shape: MarkerShape): string {
@@ -414,6 +419,7 @@ function InteractiveScatterPlot({
   alternativeIds,
   activeCreators,
   showAllLabels,
+  xAxisScale,
   theme,
   locale,
   onSelect,
@@ -476,10 +482,10 @@ function InteractiveScatterPlot({
     const minCost = Math.max(Math.min(...costs) * 0.72, 0.0001);
     const maxCost = Math.max(...costs) * 1.28;
     // ECharts dataZoom maps its percentage window linearly over the raw axis
-    // extent. Keeping log10 values on a value axis makes slider distance,
-    // chart distance, wheel zoom and dragging use the same coordinate space.
-    const minX = toLogCost(minCost);
-    const maxX = toLogCost(maxCost);
+    // extent. A transformed value axis keeps slider distance, chart distance,
+    // wheel zoom and dragging in the same coordinate space for both modes.
+    const minX = toChartCost(minCost, xAxisScale);
+    const maxX = toChartCost(maxCost, xAxisScale);
     const minY = Math.max(
       0,
       Math.floor((Math.min(...scores) - 3) / 5) * 5,
@@ -500,7 +506,10 @@ function InteractiveScatterPlot({
         costPerTask: model.costPerTask,
         modelId: model.id,
         name: model.name,
-        value: [toLogCost(model.costPerTask), model.intelligence],
+        value: [
+          toChartCost(model.costPerTask, xAxisScale),
+          model.intelligence,
+        ],
         symbol: toEChartsSymbol(creatorStyle.shape),
         symbolSize: isMobileChart
           ? isSelected || isHovered
@@ -552,7 +561,7 @@ function InteractiveScatterPlot({
         name: `${group.baseName} ${translate(locale, "chart.reasoningSeries")}`,
         type: "line",
         data: group.models.map((model) => [
-          toLogCost(model.costPerTask),
+          toChartCost(model.costPerTask, xAxisScale),
           model.intelligence,
         ]),
         showSymbol: false,
@@ -578,7 +587,7 @@ function InteractiveScatterPlot({
         name: translate(locale, "chart.frontier"),
         type: "line",
         data: frontier.map((model) => [
-          toLogCost(model.costPerTask),
+          toChartCost(model.costPerTask, xAxisScale),
           model.intelligence,
         ]),
         showSymbol: false,
@@ -615,12 +624,18 @@ function InteractiveScatterPlot({
                     },
                   },
                   {
-                    coord: [toLogCost(chartSelected.costPerTask), maxY],
+                    coord: [
+                      toChartCost(chartSelected.costPerTask, xAxisScale),
+                      maxY,
+                    ],
                   },
                 ],
                 [
                   {
-                    coord: [toLogCost(chartSelected.costPerTask), minY],
+                    coord: [
+                      toChartCost(chartSelected.costPerTask, xAxisScale),
+                      minY,
+                    ],
                     itemStyle: {
                       color: palette.accentArea,
                       borderColor: palette.accentBorder,
@@ -650,9 +665,12 @@ function InteractiveScatterPlot({
           id: "selected-x-guide",
           type: "line",
           data: [
-            [toLogCost(chartSelected.costPerTask), minY],
             [
-              toLogCost(chartSelected.costPerTask),
+              toChartCost(chartSelected.costPerTask, xAxisScale),
+              minY,
+            ],
+            [
+              toChartCost(chartSelected.costPerTask, xAxisScale),
               chartSelected.intelligence,
             ],
           ],
@@ -668,7 +686,7 @@ function InteractiveScatterPlot({
           data: [
             [minX, chartSelected.intelligence],
             [
-              toLogCost(chartSelected.costPerTask),
+              toChartCost(chartSelected.costPerTask, xAxisScale),
               chartSelected.intelligence,
             ],
           ],
@@ -722,6 +740,12 @@ function InteractiveScatterPlot({
           isMobileChart
             ? "chart.ariaDescriptionMobile"
             : "chart.ariaDescriptionDesktop",
+          {
+            scale: translate(
+              locale,
+              xAxisScale === "log" ? "chart.xScale.log" : "chart.xScale.linear",
+            ),
+          },
         ),
       },
       grid: {
@@ -780,6 +804,12 @@ function InteractiveScatterPlot({
         name: translate(
           locale,
           isMobileChart ? "chart.xAxisMobile" : "chart.xAxisDesktop",
+          {
+            scale: translate(
+              locale,
+              xAxisScale === "log" ? "chart.xScale.log" : "chart.xScale.linear",
+            ),
+          },
         ),
         nameLocation: "middle",
         nameGap: isMobileChart ? 34 : 44,
@@ -797,7 +827,8 @@ function InteractiveScatterPlot({
           fontWeight: 600,
           hideOverlap: true,
           margin: isMobileChart ? 6 : 8,
-          formatter: (value: number) => formatCost(10 ** value),
+          formatter: (value: number) =>
+            formatCost(fromChartCost(value, xAxisScale)),
         },
         splitLine: {
           show: true,
@@ -855,7 +886,8 @@ function InteractiveScatterPlot({
           right: grid.right,
           bottom: isMobileChart ? 10 : 12,
           height: isMobileChart ? 26 : 14,
-          labelFormatter: (value: number) => formatCost(10 ** value),
+          labelFormatter: (value: number) =>
+            formatCost(fromChartCost(value, xAxisScale)),
           ...sliderStyle,
           defaultLocationEdgeGap: isMobileChart ? 8 : 15,
           handleSize: isMobileChart ? 30 : "70%",
@@ -919,6 +951,7 @@ function InteractiveScatterPlot({
     locale,
     theme,
     visibleLabelIds,
+    xAxisScale,
   ]);
 
   const handleChartReady = useCallback((chart: EChartsType) => {

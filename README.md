@@ -5,7 +5,7 @@
 Parallax 是一个以散点图为入口的 AI 模型选型工具：把 Artificial Analysis 的模型能力、任务成本、速度与延迟放到同一张决策图上。
 
 <p align="center">
-  <img src="https://img-cdn.ccrui.cn/2026/08/02/6a6e3357dedbb.png" alt="Parallax AI model landscape" width="100%" />
+  <img src="https://img-cdn.ccrui.cn/2026/08/02/6a6ef520040de.png" alt="Parallax AI model landscape" width="100%" />
 </p>
 
 [![CI](https://github.com/cr-zhichen/parallax/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/cr-zhichen/parallax/actions/workflows/docker-publish.yml)

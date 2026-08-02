@@ -64,6 +64,7 @@ interface ModelExplorerProps {
 
 type ThemePreference = "system" | "light" | "dark";
 type ResolvedTheme = "light" | "dark";
+type XAxisScale = "log" | "linear";
 
 const THEME_STORAGE_KEY = "parallax-theme";
 
@@ -898,6 +899,7 @@ export function ModelExplorer({ initialCatalog }: ModelExplorerProps) {
     () => new Set(),
   );
   const [showAllLabels, setShowAllLabels] = useState(false);
+  const [xAxisScale, setXAxisScale] = useState<XAxisScale>("log");
   const [hoveredAlternativeId, setHoveredAlternativeId] = useState<string | null>(
     null,
   );
@@ -982,6 +984,9 @@ export function ModelExplorer({ initialCatalog }: ModelExplorerProps) {
     [strictAlternatives],
   );
   const sourceNotice = getLocalizedSourceNotice(catalog, t);
+  const xAxisScaleLabel = t(
+    xAxisScale === "log" ? "chart.xScale.logCost" : "chart.xScale.linearCost",
+  );
 
   if (chartModels.length === 0) {
     return (
@@ -1131,14 +1136,16 @@ export function ModelExplorer({ initialCatalog }: ModelExplorerProps) {
           >
             <div className="recommendations__heading">
               <div>
-                <p className="section-index">{t("recommendations.eyebrow")}</p>
                 <div className="recommendations__title-row">
                   <h3 id="recommendations-title">
                     {t("recommendations.title")}
                   </h3>
-                  <KneeFormulaHint t={t} locale={locale} />
                 </div>
+                <p className="recommendations__subtitle">
+                  {t("recommendations.subtitle")}
+                </p>
               </div>
+              <KneeFormulaHint t={t} locale={locale} />
             </div>
             <div className="recommendations__list">
               {recommendedModels.map((model) => (
@@ -1181,6 +1188,25 @@ export function ModelExplorer({ initialCatalog }: ModelExplorerProps) {
                 <span aria-hidden="true" />
                 {t("chart.showAllLabels")}
               </button>
+              <button
+                type="button"
+                className={`chart-scale-toggle ${xAxisScale === "log" ? "is-active" : ""}`}
+                aria-pressed={xAxisScale === "log"}
+                aria-label={t("chart.xScale.toggleAria", {
+                  current: xAxisScaleLabel,
+                })}
+                title={t("chart.xScale.toggleTitle", {
+                  current: xAxisScaleLabel,
+                })}
+                onClick={() =>
+                  setXAxisScale((current) =>
+                    current === "log" ? "linear" : "log",
+                  )
+                }
+              >
+                <span aria-hidden="true" />
+                {xAxisScaleLabel}
+              </button>
             </div>
             <ModelScatterPlot
               models={chartModels}
@@ -1189,6 +1215,7 @@ export function ModelExplorer({ initialCatalog }: ModelExplorerProps) {
               alternativeIds={alternativeIds}
               activeCreators={activeCreators}
               showAllLabels={showAllLabels}
+              xAxisScale={xAxisScale}
               theme={resolvedTheme}
               locale={locale}
               onSelect={handleSelectModel}
