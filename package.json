@@ -11,7 +11,9 @@
     "check": "pnpm lint && pnpm test && pnpm build"
   },
   "dependencies": {
+    "@chenglou/pretext": "0.0.8",
     "echarts": "^6.1.0",
+    "katex": "^0.18.1",
     "lucide-react": "^1.28.0",
     "next": "16.2.12",
     "react": "19.2.8",

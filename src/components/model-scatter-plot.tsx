@@ -1,6 +1,11 @@
 "use client";
 
 import {
+  layoutWithLines,
+  prepareWithSegments,
+  setLocale as setPretextLocale,
+} from "@chenglou/pretext";
+import {
   useCallback,
   useEffect,
   useMemo,
@@ -217,6 +222,85 @@ function formatCost(value: number): string {
   return `$${value.toFixed(value % 1 === 0 ? 0 : 1)}`;
 }
 
+function escapeTooltipText(value: string): string {
+  return value.replace(
+    /[&<>"']/g,
+    (character) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[character] ?? character,
+  );
+}
+
+const CHART_TOOLTIP_MAX_WIDTH = 600;
+const CHART_TOOLTIP_VIEWPORT_GUTTER = 32;
+const CHART_TOOLTIP_HORIZONTAL_PADDING = {
+  mobile: 16,
+  desktop: 20,
+} as const;
+
+let configuredChartTooltipPretextLocale: Locale | null = null;
+
+function ensureChartTooltipPretextLocale(locale: Locale) {
+  if (configuredChartTooltipPretextLocale === locale) return;
+  setPretextLocale(locale);
+  configuredChartTooltipPretextLocale = locale;
+}
+
+function getChartTooltipContentWidth(isMobileChart: boolean): number {
+  const viewportWidth =
+    typeof window === "undefined" ? CHART_TOOLTIP_MAX_WIDTH : window.innerWidth;
+  const outerWidth = Math.min(
+    CHART_TOOLTIP_MAX_WIDTH,
+    Math.max(1, viewportWidth - CHART_TOOLTIP_VIEWPORT_GUTTER),
+  );
+  const horizontalPadding = isMobileChart
+    ? CHART_TOOLTIP_HORIZONTAL_PADDING.mobile
+    : CHART_TOOLTIP_HORIZONTAL_PADDING.desktop;
+  return Math.max(1, outerWidth - horizontalPadding);
+}
+
+function layoutChartTooltipLines(
+  text: string,
+  font: string,
+  maxWidth: number,
+  locale: Locale,
+  whiteSpace: "normal" | "pre-wrap",
+  cache: Map<string, string[]>,
+): string[] {
+  const cacheKey = `${locale}\u0000${font}\u0000${maxWidth}\u0000${whiteSpace}\u0000${text}`;
+  const cachedLines = cache.get(cacheKey);
+  if (cachedLines) return cachedLines;
+
+  try {
+    ensureChartTooltipPretextLocale(locale);
+    const prepared = prepareWithSegments(text, font, { whiteSpace });
+    const { lines } = layoutWithLines(prepared, maxWidth, 22);
+    const laidOutLines = lines.map((line) => line.text);
+    cache.set(cacheKey, laidOutLines);
+    return laidOutLines;
+  } catch {
+    // Canvas and Intl.Segmenter are required by Pretext. CSS remains the
+    // fallback for restricted browser environments.
+    const fallbackLines = [text];
+    cache.set(cacheKey, fallbackLines);
+    return fallbackLines;
+  }
+}
+
+function renderChartTooltipLines(lines: string[]): string {
+  return lines
+    .map(
+      (line) =>
+        `<div class="model-chart-tooltip__line">${escapeTooltipText(line)}</div>`,
+    )
+    .join("");
+}
+
 function toLogCost(value: number): number {
   return Math.log10(value);
 }
@@ -383,6 +467,10 @@ function InteractiveScatterPlot({
   );
 
   const option = useMemo<ChartOption>(() => {
+    const tooltipLineCache = new Map<string, string[]>();
+    const tooltipFontSize = isMobileChart ? 10 : 11;
+    const tooltipFont = `650 ${tooltipFontSize}px Inter`;
+
     const costs = chartModels.map((model) => model.costPerTask);
     const scores = chartModels.map((model) => model.intelligence);
     const minCost = Math.max(Math.min(...costs) * 0.72, 0.0001);
@@ -645,11 +733,14 @@ function InteractiveScatterPlot({
       },
       tooltip: {
         trigger: "item",
-        renderMode: "richText",
+        renderMode: "html",
         confine: true,
         borderWidth: 0,
         padding: isMobileChart ? [7, 8] : [8, 10],
         backgroundColor: palette.tooltipBackground,
+        className: "model-chart-tooltip",
+        extraCssText:
+          "max-width:min(600px,calc(100vw - 32px));white-space:normal;overflow-wrap:anywhere;word-break:break-word;line-height:22px;",
         textStyle: {
           color: palette.tooltipText,
           fontSize: isMobileChart ? 10 : 11,
@@ -657,8 +748,29 @@ function InteractiveScatterPlot({
         },
         formatter: (params) => {
           const item = Array.isArray(params) ? params[0] : params;
-          if (!item || !isScatterDatum(item.data)) return item?.name ?? "";
-          return `${item.data.name}\n${translate(locale, "chart.tooltipAbility")} ${item.data.value[1].toFixed(1)}   ${translate(locale, "chart.tooltipCost")} ${formatCost(item.data.costPerTask)}`;
+          if (!item || !isScatterDatum(item.data)) {
+            return escapeTooltipText(item?.name ?? "");
+          }
+
+          const metrics = `${translate(locale, "chart.tooltipAbility")} ${item.data.value[1].toFixed(1)}   ${translate(locale, "chart.tooltipCost")} ${formatCost(item.data.costPerTask)}`;
+          const contentWidth = getChartTooltipContentWidth(isMobileChart);
+          const modelNameLines = layoutChartTooltipLines(
+            item.data.name,
+            tooltipFont,
+            contentWidth,
+            locale,
+            "normal",
+            tooltipLineCache,
+          );
+          const metricLines = layoutChartTooltipLines(
+            metrics,
+            tooltipFont,
+            contentWidth,
+            locale,
+            "pre-wrap",
+            tooltipLineCache,
+          );
+          return `${renderChartTooltipLines(modelNameLines)}${renderChartTooltipLines(metricLines)}`;
         },
       },
       xAxis: {

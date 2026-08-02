@@ -5,6 +5,11 @@ type ChartableModel = ModelPoint & {
   costPerTask: number;
 };
 
+export interface KneeRecommendation extends ChartableModel {
+  kneeScore: number;
+  idealDistance: number;
+}
+
 export interface Alternative extends ChartableModel {
   scoreDelta: number;
   costDeltaRatio: number;
@@ -185,50 +190,66 @@ export function getParetoFrontier(models: ModelPoint[]): ChartableModel[] {
   });
 }
 
-export function pickDefaultModel(models: ModelPoint[]): ModelPoint | undefined {
-  const chartable = chartableModels(models);
-  if (chartable.length === 0) return models[0];
+const KNEE_TIE_TOLERANCE = 1e-12;
 
-  const frontier = getParetoFrontier(chartable);
-  if (frontier.length === 1) return frontier[0];
+function scoreKneeFrontier(frontier: ChartableModel[]): KneeRecommendation[] {
+  if (frontier.length === 0) return [];
+  if (frontier.length === 1) {
+    return [
+      {
+        ...frontier[0],
+        kneeScore: 0,
+        idealDistance: 0,
+      },
+    ];
+  }
 
   const cheapest = frontier[0];
   const strongest = frontier[frontier.length - 1];
   const minLogCost = Math.log10(cheapest.costPerTask);
   const logCostRange = Math.log10(strongest.costPerTask) - minLogCost;
   const intelligenceRange = strongest.intelligence - cheapest.intelligence;
-  const tieTolerance = 1e-12;
 
-  const kneeMetrics = (model: ChartableModel) => {
-    const normalizedCost =
-      (Math.log10(model.costPerTask) - minLogCost) / logCostRange;
-    const normalizedIntelligence =
-      (model.intelligence - cheapest.intelligence) / intelligenceRange;
+  return frontier
+    .map((model) => {
+      const normalizedCost =
+        (Math.log10(model.costPerTask) - minLogCost) / logCostRange;
+      const normalizedIntelligence =
+        (model.intelligence - cheapest.intelligence) / intelligenceRange;
 
-    return {
-      // Proportional to the signed perpendicular distance above the line
-      // connecting the cheapest and strongest Pareto-frontier endpoints.
-      kneeScore: normalizedIntelligence - normalizedCost,
-      idealDistance: Math.hypot(normalizedCost, 1 - normalizedIntelligence),
-    };
-  };
+      return {
+        ...model,
+        // Proportional to the signed perpendicular distance above the line
+        // connecting the cheapest and strongest Pareto-frontier endpoints.
+        kneeScore: normalizedIntelligence - normalizedCost,
+        idealDistance: Math.hypot(normalizedCost, 1 - normalizedIntelligence),
+      };
+    })
+    .sort((a, b) => {
+      const kneeDelta = b.kneeScore - a.kneeScore;
+      if (Math.abs(kneeDelta) > KNEE_TIE_TOLERANCE) return kneeDelta;
 
-  return frontier.reduce((best, model) => {
-    const bestMetrics = kneeMetrics(best);
-    const modelMetrics = kneeMetrics(model);
-    const kneeDelta = modelMetrics.kneeScore - bestMetrics.kneeScore;
+      const idealDelta = a.idealDistance - b.idealDistance;
+      if (Math.abs(idealDelta) > KNEE_TIE_TOLERANCE) return idealDelta;
 
-    if (Math.abs(kneeDelta) > tieTolerance) {
-      return kneeDelta > 0 ? model : best;
-    }
+      return a.costPerTask - b.costPerTask;
+    });
+}
 
-    const idealDelta = modelMetrics.idealDistance - bestMetrics.idealDistance;
-    if (Math.abs(idealDelta) > tieTolerance) {
-      return idealDelta < 0 ? model : best;
-    }
+export function getKneeRecommendations(
+  models: ModelPoint[],
+  limit = 5,
+): KneeRecommendation[] {
+  const frontier = getParetoFrontier(chartableModels(models));
+  const normalizedLimit = Math.max(0, Math.floor(limit));
+  return scoreKneeFrontier(frontier).slice(0, normalizedLimit);
+}
 
-    return model.costPerTask < best.costPerTask ? model : best;
-  });
+export function pickDefaultModel(models: ModelPoint[]): ModelPoint | undefined {
+  const chartable = chartableModels(models);
+  if (chartable.length === 0) return models[0];
+
+  return getKneeRecommendations(chartable, 1)[0];
 }
 
 export function creatorsFromModels(models: ModelPoint[]): string[] {

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   findBalancedAlternatives,
   findStrictAlternatives,
+  getKneeRecommendations,
   getParetoFrontier,
   getReasoningVariantGroups,
   pickDefaultModel,
@@ -126,6 +127,37 @@ describe("pickDefaultModel", () => {
     ]);
 
     expect(result?.id).toBe("balanced");
+  });
+});
+
+describe("getKneeRecommendations", () => {
+  it("ranks Pareto-frontier models by knee score and excludes dominated models", () => {
+    const result = getKneeRecommendations(
+      [
+        model("cheapest", 10, 0.01),
+        model("global-knee", 45, 0.03),
+        model("later-frontier", 50, 0.2),
+        model("strongest", 60, 1),
+        model("dominated", 44, 0.04),
+      ],
+      3,
+    );
+
+    expect(result.map((item) => item.id)).toEqual([
+      "global-knee",
+      "later-frontier",
+      "cheapest",
+    ]);
+    expect(result[0].kneeScore).toBeGreaterThan(result[1].kneeScore);
+    expect(result.every((item) => item.id !== "dominated")).toBe(true);
+  });
+
+  it("returns a zero-score recommendation for a single-model frontier", () => {
+    const [result] = getKneeRecommendations([model("only", 40, 0.1)]);
+
+    expect(result.id).toBe("only");
+    expect(result.kneeScore).toBe(0);
+    expect(result.idealDistance).toBe(0);
   });
 });
 

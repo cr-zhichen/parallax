@@ -1,6 +1,12 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import {
+  layoutWithLines,
+  prepareWithSegments,
+  setLocale as setPretextLocale,
+} from "@chenglou/pretext";
+import katex from "katex";
 import { Moon, Sun, SunMoon } from "lucide-react";
 import {
   useEffect,
@@ -18,9 +24,11 @@ import {
   creatorsFromModels,
   findBalancedAlternatives,
   findStrictAlternatives,
+  getKneeRecommendations,
   pickDefaultModel,
   searchModels,
   type Alternative,
+  type KneeRecommendation,
 } from "@/lib/model-logic";
 import {
   isChartableModel,
@@ -598,6 +606,259 @@ function AlternativeRow({
   );
 }
 
+function RecommendationCard({
+  model,
+  t,
+  isSelected,
+  onSelect,
+}: {
+  model: KneeRecommendation;
+  t: Translator;
+  isSelected: boolean;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`recommendation-card ${isSelected ? "is-selected" : ""}`}
+      aria-label={t("recommendations.select", { model: model.name })}
+      onClick={() => onSelect(model.id)}
+    >
+      <span className="recommendation-card__main">
+        <span className="recommendation-card__name">
+          <strong>{model.name}</strong>
+        </span>
+      </span>
+      <span className="recommendation-card__score">
+        <small>{t("recommendations.score")}</small>
+        <strong>{model.kneeScore.toFixed(3)}</strong>
+      </span>
+      <span className="recommendation-card__stats">
+        <span>
+          {t("metric.intelligence")} {formatNumber(model.intelligence)}
+        </span>
+        <span>
+          {t("metric.cost")} {formatCost(model.costPerTask)}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+const KNEE_COST_FORMULA = String.raw`
+x = \frac{\log_{10}(C) - \log_{10}(C_0)}{\log_{10}(C_1) - \log_{10}(C_0)}`;
+const KNEE_INTELLIGENCE_FORMULA = String.raw`
+y = \frac{I - I_0}{I_1 - I_0}`;
+const KNEE_SCORE_FORMULA = String.raw`\mathrm{kneeScore} = y - x`;
+const KNEE_DISTANCE_FORMULA = String.raw`\mathrm{idealDistance} = \sqrt{x^2 + (1-y)^2}`;
+
+const FORMULA_TOOLTIP_MAX_WIDTH = 400;
+const FORMULA_TOOLTIP_VIEWPORT_GUTTER = 48;
+const FORMULA_TOOLTIP_HORIZONTAL_INSET = 30;
+
+let configuredPretextLocale: Locale | null = null;
+
+function ensurePretextLocale(locale: Locale) {
+  if (configuredPretextLocale === locale) return;
+  setPretextLocale(locale);
+  configuredPretextLocale = locale;
+}
+
+function useViewportWidth() {
+  const [viewportWidth, setViewportWidth] = useState<number | null>(null);
+
+  useEffect(() => {
+    const updateViewportWidth = () => setViewportWidth(window.innerWidth);
+    updateViewportWidth();
+    window.addEventListener("resize", updateViewportWidth);
+    return () => window.removeEventListener("resize", updateViewportWidth);
+  }, []);
+
+  return viewportWidth;
+}
+
+function getFormulaTooltipContentWidth(viewportWidth: number | null) {
+  if (viewportWidth === null) return null;
+
+  const tooltipWidth = Math.min(
+    FORMULA_TOOLTIP_MAX_WIDTH,
+    Math.max(0, viewportWidth - FORMULA_TOOLTIP_VIEWPORT_GUTTER),
+  );
+  return Math.max(1, tooltipWidth - FORMULA_TOOLTIP_HORIZONTAL_INSET);
+}
+
+function PretextParagraph({
+  text,
+  className,
+  font,
+  lineHeight,
+  maxWidth,
+  locale,
+}: {
+  text: string;
+  className: string;
+  font: string;
+  lineHeight: number;
+  maxWidth: number | null;
+  locale: Locale;
+}) {
+  const [laidOutText, setLaidOutText] = useState<{
+    font: string;
+    maxWidth: number;
+    source: string;
+    value: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    if (maxWidth === null || maxWidth <= 0) return;
+
+    let nextLayout: string | null = null;
+    try {
+      ensurePretextLocale(locale);
+      const prepared = prepareWithSegments(text, font);
+      const { lines } = layoutWithLines(prepared, maxWidth, lineHeight);
+      nextLayout = lines.map((line) => line.text).join("\n");
+    } catch {
+      // Canvas and Intl.Segmenter are required by Pretext. CSS remains the
+      // fallback for restricted browser environments.
+    }
+
+    const updateTimer = window.setTimeout(
+      () => setLaidOutText({ font, maxWidth, source: text, value: nextLayout }),
+      0,
+    );
+    return () => window.clearTimeout(updateTimer);
+  }, [font, lineHeight, locale, maxWidth, text]);
+
+  const renderedText =
+    maxWidth !== null &&
+    laidOutText?.font === font &&
+    laidOutText.maxWidth === maxWidth &&
+    laidOutText.source === text
+      ? (laidOutText.value ?? text)
+      : text;
+
+  return (
+    <span className={`${className} recommendations__pretext`}>
+      {renderedText}
+    </span>
+  );
+}
+
+function KaTeXFormula({ expression }: { expression: string }) {
+  const markup = useMemo(
+    () =>
+      katex.renderToString(expression, {
+        displayMode: false,
+        throwOnError: false,
+      }),
+    [expression],
+  );
+
+  return (
+    <span
+      className="recommendations__formula-display"
+      dangerouslySetInnerHTML={{ __html: markup }}
+    />
+  );
+}
+
+function KneeFormulaHint({ t, locale }: { t: Translator; locale: Locale }) {
+  const viewportWidth = useViewportWidth();
+  const tooltipContentWidth = getFormulaTooltipContentWidth(viewportWidth);
+
+  return (
+    <span
+      className="recommendations__formula-hint"
+      tabIndex={0}
+      aria-label={t("recommendations.formulaTitle")}
+    >
+      ?
+      <span className="recommendations__formula-tooltip" role="tooltip">
+        <strong>{t("recommendations.formulaTitle")}</strong>
+        <PretextParagraph
+          text={t("recommendations.formulaText")}
+          className="recommendations__formula-intro"
+          font="650 12px Inter"
+          lineHeight={18.6}
+          maxWidth={tooltipContentWidth}
+          locale={locale}
+        />
+        <PretextParagraph
+          text={t("recommendations.formulaVariables")}
+          className="recommendations__formula-variables"
+          font="500 10px Inter"
+          lineHeight={15}
+          maxWidth={tooltipContentWidth}
+          locale={locale}
+        />
+        <span className="recommendations__formula-list">
+          <span className="recommendations__formula-row">
+            <PretextParagraph
+              text={t("recommendations.formulaCostLabel")}
+              className="recommendations__formula-row-label"
+              font="700 10px Inter"
+              lineHeight={13}
+              maxWidth={78}
+              locale={locale}
+            />
+            <KaTeXFormula expression={KNEE_COST_FORMULA} />
+          </span>
+          <span className="recommendations__formula-row">
+            <PretextParagraph
+              text={t("recommendations.formulaIntelligenceLabel")}
+              className="recommendations__formula-row-label"
+              font="700 10px Inter"
+              lineHeight={13}
+              maxWidth={78}
+              locale={locale}
+            />
+            <KaTeXFormula expression={KNEE_INTELLIGENCE_FORMULA} />
+          </span>
+          <span className="recommendations__formula-row">
+            <PretextParagraph
+              text={t("recommendations.formulaScoreLabel")}
+              className="recommendations__formula-row-label"
+              font="700 10px Inter"
+              lineHeight={13}
+              maxWidth={78}
+              locale={locale}
+            />
+            <KaTeXFormula expression={KNEE_SCORE_FORMULA} />
+          </span>
+        </span>
+        <PretextParagraph
+          text={t("recommendations.formulaMeaning")}
+          className="recommendations__formula-meaning"
+          font="600 11px Inter"
+          lineHeight={17.05}
+          maxWidth={tooltipContentWidth}
+          locale={locale}
+        />
+        <span className="recommendations__formula-tie">
+          <PretextParagraph
+            text={t("recommendations.formulaTieLabel")}
+            className="recommendations__formula-tie-label"
+            font="700 10px Inter"
+            lineHeight={13}
+            maxWidth={78}
+            locale={locale}
+          />
+          <KaTeXFormula expression={KNEE_DISTANCE_FORMULA} />
+        </span>
+        <PretextParagraph
+          text={t("recommendations.formulaSelection")}
+          className="recommendations__formula-selection"
+          font="500 11px Inter"
+          lineHeight={16.5}
+          maxWidth={tooltipContentWidth}
+          locale={locale}
+        />
+      </span>
+    </span>
+  );
+}
+
 function getSelectedModel(
   catalog: ModelCatalog,
   selectedId: string | null,
@@ -688,6 +949,10 @@ export function ModelExplorer({ initialCatalog }: ModelExplorerProps) {
   const selectedIsComparable = selected !== null && isChartableModel(selected);
   const chartModels = useMemo(
     () => chartableModels(catalog.models),
+    [catalog.models],
+  );
+  const recommendedModels = useMemo(
+    () => getKneeRecommendations(catalog.models, 5),
     [catalog.models],
   );
   const creators = useMemo(
@@ -858,6 +1123,39 @@ export function ModelExplorer({ initialCatalog }: ModelExplorerProps) {
             );
           })}
         </div>
+
+        {recommendedModels.length > 0 ? (
+          <section
+            className="recommendations"
+            aria-labelledby="recommendations-title"
+          >
+            <div className="recommendations__heading">
+              <div>
+                <p className="section-index">{t("recommendations.eyebrow")}</p>
+                <div className="recommendations__title-row">
+                  <h3 id="recommendations-title">
+                    {t("recommendations.title")}
+                  </h3>
+                  <KneeFormulaHint t={t} locale={locale} />
+                </div>
+              </div>
+            </div>
+            <div className="recommendations__list">
+              {recommendedModels.map((model) => (
+                <RecommendationCard
+                  key={model.id}
+                  model={model}
+                  t={t}
+                  isSelected={selected?.id === model.id}
+                  onSelect={(id) => {
+                    handleSelectModel(id);
+                    setActiveCreators(new Set());
+                  }}
+                />
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         <div className="analysis-grid">
           <section className="chart-card" aria-label={t("chart.areaLabel")}>
