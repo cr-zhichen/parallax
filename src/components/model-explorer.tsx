@@ -643,6 +643,16 @@ export function ModelExplorer({ initialCatalog }: ModelExplorerProps) {
   const [isChartLabelToggleWrapped, setIsChartLabelToggleWrapped] =
     useState(false);
 
+  const handleSelectModel = (id: string) => {
+    setHoveredAlternativeId(null);
+    setSelectedId(id);
+  };
+
+  const handleClearSelection = () => {
+    setHoveredAlternativeId(null);
+    setSelectedId(null);
+  };
+
   useEffect(() => {
     const meta = chartMetaRef.current;
     if (!meta) return;
@@ -791,7 +801,7 @@ export function ModelExplorer({ initialCatalog }: ModelExplorerProps) {
             locale={locale}
             t={t}
             onSelect={(id) => {
-              setSelectedId(id);
+              handleSelectModel(id);
               setActiveCreators(new Set());
             }}
           />
@@ -883,8 +893,8 @@ export function ModelExplorer({ initialCatalog }: ModelExplorerProps) {
               showAllLabels={showAllLabels}
               theme={resolvedTheme}
               locale={locale}
-              onSelect={setSelectedId}
-              onClearSelection={() => setSelectedId(null)}
+              onSelect={handleSelectModel}
+              onClearSelection={handleClearSelection}
             />
           </section>
 
@@ -989,7 +999,7 @@ export function ModelExplorer({ initialCatalog }: ModelExplorerProps) {
                       key={model.id}
                       model={model}
                       t={t}
-                      onSelect={setSelectedId}
+                      onSelect={handleSelectModel}
                       onHover={setHoveredAlternativeId}
                     />
                   ))}
@@ -1046,7 +1056,7 @@ export function ModelExplorer({ initialCatalog }: ModelExplorerProps) {
                       key={model.id}
                       model={model}
                       t={t}
-                      onSelect={setSelectedId}
+                      onSelect={handleSelectModel}
                       onHover={setHoveredAlternativeId}
                     />
                   ))}
