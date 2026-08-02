@@ -133,6 +133,11 @@ describe("getReasoningVariantGroups", () => {
   it("groups explicit reasoning levels by creator and base model in level order", () => {
     const models = [
       {
+        ...model("luna-non-reasoning", 30, 0.008),
+        name: "GPT Luna (Non-reasoning)",
+        creator: "OpenAI",
+      },
+      {
         ...model("luna-high", 46, 0.029),
         name: "GPT Luna (high)",
         creator: "OpenAI",
@@ -159,9 +164,32 @@ describe("getReasoningVariantGroups", () => {
     expect(result).toHaveLength(1);
     expect(result[0].baseName).toBe("GPT Luna");
     expect(result[0].models.map((item) => item.id)).toEqual([
+      "luna-non-reasoning",
       "luna-medium",
       "luna-high",
       "luna-xhigh",
+    ]);
+  });
+
+  it("accepts non-reasoning as the first reasoning variant", () => {
+    const models = [
+      {
+        ...model("luna-non-reasoning", 30, 0.008),
+        name: "GPT Luna (Non-reasoning)",
+        creator: "OpenAI",
+      },
+      {
+        ...model("luna-high", 46, 0.029),
+        name: "GPT Luna (high)",
+        creator: "OpenAI",
+      },
+    ];
+
+    const result = getReasoningVariantGroups(models);
+
+    expect(result[0].models.map((item) => item.name)).toEqual([
+      "GPT Luna (Non-reasoning)",
+      "GPT Luna (high)",
     ]);
   });
 

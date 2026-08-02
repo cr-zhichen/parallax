@@ -18,6 +18,7 @@ export interface ReasoningVariantGroup {
 }
 
 const REASONING_LEVEL_RANKS = new Map<string, number>([
+  ["nonreasoning", -1],
   ["minimal", 0],
   ["low", 1],
   ["medium", 2],
@@ -29,7 +30,7 @@ const REASONING_LEVEL_RANKS = new Map<string, number>([
 
 const TRAILING_MODEL_DETAILS = /\s*\(([^()]*)\)\s*$/;
 const REASONING_LEVEL_DETAILS =
-  /^(?:(?:reasoning|thinking)\s*,?\s*)?(minimal|low|medium|high|x[\s-]?high|max|ultra)(?:\s+effort)?$/i;
+  /^(?:(?:reasoning|thinking)\s*,?\s*)?(non[\s-]?reasoning|minimal|low|medium|high|x[\s-]?high|max|ultra)(?:\s+effort)?$/i;
 
 export function chartableModels(models: ModelPoint[]): ChartableModel[] {
   return models.filter(isChartableModel);
