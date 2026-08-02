@@ -45,11 +45,13 @@ mise run dev
 | --- | --- | --- |
 | `ARTIFICIAL_ANALYSIS_API_KEY` | 空 | Artificial Analysis API Key，只在 Next.js 服务端使用。 |
 | `ARTIFICIAL_ANALYSIS_API_TIER` | `free` | `free` 使用免费模型目录；`pro` 或 `commercial` 使用订阅接口。 |
+| `PARALLAX_CATALOG_CACHE_PATH` | `data/model-catalog.json` | 模型目录持久化快照路径；Docker 默认写入 `/app/data/model-catalog.json`。 |
 
 服务端会读取全部分页（最多 20 页），按稳定的模型 ID 去重，并在以下时间自动同步：
 
-- 每小时 `:00` 与 `:30` 执行一次；
+- 每 8 小时执行一次；
 - 前端不轮询，也不提供手动刷新；
+- 成功拉取的目录会写入持久化快照；服务重启后优先恢复快照；
 - 实时请求失败时优先保留上一次有效目录，首次失败则回退到演示数据。
 
 ## 常用命令
@@ -61,7 +63,7 @@ mise run dev
 | `mise run test` | 运行 Vitest 单元测试 |
 | `mise run build` | 构建生产版本 |
 | `mise run check` | 依次执行 lint、test、build |
-| `mise run start` | 启动生产服务器（包含半小时同步调度器） |
+| `mise run start` | 启动生产服务器（包含 8 小时同步调度器） |
 
 ## Docker 部署
 
@@ -70,9 +72,12 @@ mise run dev
 ```bash
 cp .env.example .env
 # 可选：编辑 .env，填入 ARTIFICIAL_ANALYSIS_API_KEY
+mkdir -p data
 docker compose pull
 docker compose up -d
 ```
+
+模型目录快照保存在宿主机的 `./data/model-catalog.json`，通过目录映射挂载到容器；不要使用 `docker compose down -v`，否则会删除其他 Docker 卷（快照目录本身不会被该命令删除）。
 
 打开 <http://localhost:3000>，健康检查地址为 <http://localhost:3000/api/health>。停止服务：
 

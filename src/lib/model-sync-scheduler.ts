@@ -1,10 +1,11 @@
 import "server-only";
 
 import { getModelCatalog } from "@/lib/artificial-analysis";
+import { CATALOG_REFRESH_HOURS } from "@/lib/models";
 import {
-  getNextHalfHourBoundary,
-  millisecondsUntilNextHalfHour,
-} from "@/lib/half-hour-schedule";
+  getNextCatalogRefreshBoundary,
+  millisecondsUntilNextCatalogRefresh,
+} from "@/lib/refresh-schedule";
 
 interface SchedulerState {
   started: boolean;
@@ -32,8 +33,8 @@ function allowProcessToExit(timer: ReturnType<typeof setTimeout>) {
 
 function scheduleNextRefresh() {
   const now = new Date();
-  const nextRun = getNextHalfHourBoundary(now);
-  const delay = millisecondsUntilNextHalfHour(now);
+  const nextRun = getNextCatalogRefreshBoundary(now);
+  const delay = millisecondsUntilNextCatalogRefresh(now);
 
   schedulerState.nextRunAt = nextRun.toISOString();
   schedulerState.timer = setTimeout(async () => {
@@ -65,7 +66,7 @@ export function startModelSyncScheduler() {
   scheduleNextRefresh();
 
   console.info("[Parallax] Backend model refresh scheduled", {
-    cadence: "hourly at :00 and :30",
+    cadence: `every ${CATALOG_REFRESH_HOURS} hours`,
     nextRunAt: schedulerState.nextRunAt,
   });
 }

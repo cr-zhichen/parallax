@@ -1,4 +1,5 @@
-export const CATALOG_REFRESH_SECONDS = 30 * 60;
+export const CATALOG_REFRESH_HOURS = 8;
+export const CATALOG_REFRESH_SECONDS = CATALOG_REFRESH_HOURS * 60 * 60;
 export const CATALOG_REFRESH_MS = CATALOG_REFRESH_SECONDS * 1000;
 
 export type SourceMode = "live" | "demo";

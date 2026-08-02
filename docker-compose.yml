@@ -7,6 +7,9 @@ services:
       NODE_ENV: production
       ARTIFICIAL_ANALYSIS_API_KEY: ${ARTIFICIAL_ANALYSIS_API_KEY:-}
       ARTIFICIAL_ANALYSIS_API_TIER: ${ARTIFICIAL_ANALYSIS_API_TIER:-free}
+      PARALLAX_CATALOG_CACHE_PATH: ${PARALLAX_CATALOG_CACHE_PATH:-/app/data/model-catalog.json}
+    volumes:
+      - ./data:/app/data
     restart: unless-stopped
     healthcheck:
       test:

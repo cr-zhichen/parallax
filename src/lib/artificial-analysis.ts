@@ -1,7 +1,8 @@
 import "server-only";
 
+import { readCatalogCache, writeCatalogCache } from "@/lib/catalog-cache";
 import { getDemoCatalog } from "@/lib/demo-data";
-import { getNextHalfHourBoundary } from "@/lib/half-hour-schedule";
+import { getNextCatalogRefreshBoundary } from "@/lib/refresh-schedule";
 import {
   CATALOG_REFRESH_MS,
   CATALOG_REFRESH_SECONDS,
@@ -65,6 +66,8 @@ interface CatalogRuntimeState {
   catalog: ModelCatalog | null;
   validUntil: number;
   refreshPromise: Promise<ModelCatalog> | null;
+  cacheLoaded: boolean;
+  cacheLoadPromise: Promise<void> | null;
 }
 
 interface GetModelCatalogOptions {
@@ -87,6 +90,8 @@ const catalogState =
     catalog: null,
     validUntil: 0,
     refreshPromise: null,
+    cacheLoaded: false,
+    cacheLoadPromise: null,
   });
 
 function finiteOrNull(value: unknown): number | null {
@@ -143,6 +148,38 @@ function getEndpoint(): string {
   return configuredTier === "pro" || configuredTier === "commercial"
     ? "/language/models"
     : "/language/models/free";
+}
+
+async function ensureCatalogCacheLoaded(): Promise<void> {
+  if (catalogState.cacheLoaded) return;
+  if (catalogState.cacheLoadPromise) return catalogState.cacheLoadPromise;
+
+  catalogState.cacheLoadPromise = (async () => {
+    const snapshot = await readCatalogCache();
+    if (!snapshot) return;
+
+    catalogState.catalog = snapshot.catalog;
+    catalogState.validUntil = getNextCatalogRefreshBoundary(
+      new Date(snapshot.savedAt),
+    ).getTime();
+
+    console.info("[Parallax] Restored model catalog cache", {
+      modelCount: snapshot.catalog.models.length,
+      savedAt: snapshot.savedAt,
+      validUntil: new Date(catalogState.validUntil).toISOString(),
+    });
+  })()
+    .catch((error) => {
+      console.warn("[Parallax] Model catalog cache restore failed", {
+        error: error instanceof Error ? error.name : "UnknownError",
+      });
+    })
+    .finally(() => {
+      catalogState.cacheLoaded = true;
+      catalogState.cacheLoadPromise = null;
+    });
+
+  return catalogState.cacheLoadPromise;
 }
 
 async function fetchPage(
@@ -222,6 +259,27 @@ async function fetchLiveCatalog(
 export async function getModelCatalog(
   options: GetModelCatalogOptions = {},
 ): Promise<ModelCatalog> {
+  const apiKey = process.env.ARTIFICIAL_ANALYSIS_API_KEY?.trim();
+
+  if (!apiKey) {
+    const now = Date.now();
+    if (
+      catalogState.catalog?.source.mode === "demo" &&
+      now < catalogState.validUntil
+    ) {
+      return catalogState.catalog;
+    }
+
+    const demoCatalog = getDemoCatalog();
+    catalogState.catalog = demoCatalog;
+    catalogState.validUntil = getNextCatalogRefreshBoundary(
+      new Date(),
+    ).getTime();
+    return demoCatalog;
+  }
+
+  await ensureCatalogCacheLoaded();
+
   const now = Date.now();
   const boundaryExpired =
     catalogState.catalog !== null && now >= catalogState.validUntil;
@@ -234,38 +292,36 @@ export async function getModelCatalog(
 
   const bypassCache = options.force === true || boundaryExpired;
   catalogState.refreshPromise = (async () => {
-    const apiKey = process.env.ARTIFICIAL_ANALYSIS_API_KEY?.trim();
     let nextCatalog: ModelCatalog;
 
-    if (!apiKey) {
-      nextCatalog = getDemoCatalog();
-    } else {
+    try {
+      nextCatalog = await fetchLiveCatalog(apiKey, bypassCache);
       try {
-        nextCatalog = await fetchLiveCatalog(apiKey, bypassCache);
+        await writeCatalogCache(nextCatalog);
       } catch (error) {
-        const status =
-          error instanceof ArtificialAnalysisError ? error.status : undefined;
-        const notice = status
-          ? `实时数据源返回 ${status}，暂时显示示例数据。请检查 API Key 与订阅层级。`
-          : "实时数据源暂时不可用，当前显示示例数据。";
-
-        console.error("[Parallax] Model catalog refresh failed", {
-          status,
+        console.error("[Parallax] Model catalog cache write failed", {
           error: error instanceof Error ? error.name : "UnknownError",
         });
-
-        nextCatalog =
-          catalogState.catalog ??
-          getDemoCatalog(
-            notice,
-            status ? "apiError" : "unavailable",
-            status,
-          );
       }
+    } catch (error) {
+      const status =
+        error instanceof ArtificialAnalysisError ? error.status : undefined;
+      const notice = status
+        ? `实时数据源返回 ${status}，暂时显示示例数据。请检查 API Key 与订阅层级。`
+        : "实时数据源暂时不可用，当前显示示例数据。";
+
+      console.error("[Parallax] Model catalog refresh failed", {
+        status,
+        error: error instanceof Error ? error.name : "UnknownError",
+      });
+
+      nextCatalog =
+        catalogState.catalog ??
+        getDemoCatalog(notice, status ? "apiError" : "unavailable", status);
     }
 
     catalogState.catalog = nextCatalog;
-    catalogState.validUntil = getNextHalfHourBoundary(new Date()).getTime();
+    catalogState.validUntil = getNextCatalogRefreshBoundary(new Date()).getTime();
     return nextCatalog;
   })().finally(() => {
     catalogState.refreshPromise = null;
