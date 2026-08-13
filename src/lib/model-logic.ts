@@ -34,8 +34,8 @@ const REASONING_LEVEL_RANKS = new Map<string, number>([
 ]);
 
 const TRAILING_MODEL_DETAILS = /\s*\(([^()]*)\)\s*$/;
-const REASONING_LEVEL_DETAILS =
-  /^(?:(?:reasoning|thinking)\s*,?\s*)?(non[\s-]?reasoning|minimal|low|medium|high|x[\s-]?high|max|ultra)(?:\s+effort)?$/i;
+const REASONING_LEVEL_DETAIL =
+  /^(non[\s-]?reasoning|minimal|low|medium|high|x[\s-]?high|max|ultra)(?:\s+effort)?$/i;
 
 export function chartableModels(models: ModelPoint[]): ChartableModel[] {
   return models.filter(isChartableModel);
@@ -45,7 +45,10 @@ function parseReasoningVariant(model: ChartableModel) {
   const detailsMatch = model.name.match(TRAILING_MODEL_DETAILS);
   if (!detailsMatch) return null;
 
-  const levelMatch = detailsMatch[1].trim().match(REASONING_LEVEL_DETAILS);
+  const levelMatch = detailsMatch[1]
+    .split(",")
+    .map((detail) => detail.trim().match(REASONING_LEVEL_DETAIL))
+    .find((match) => match !== null);
   if (!levelMatch) return null;
 
   const level = levelMatch[1].toLocaleLowerCase().replace(/[\s-]/g, "");

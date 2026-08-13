@@ -207,7 +207,7 @@ describe("getReasoningVariantGroups", () => {
     const models = [
       {
         ...model("luna-non-reasoning", 30, 0.008),
-        name: "GPT Luna (Non-reasoning)",
+        name: "GPT Luna (Non-reasoning, High Effort)",
         creator: "OpenAI",
       },
       {
@@ -220,7 +220,7 @@ describe("getReasoningVariantGroups", () => {
     const result = getReasoningVariantGroups(models);
 
     expect(result[0].models.map((item) => item.name)).toEqual([
-      "GPT Luna (Non-reasoning)",
+      "GPT Luna (Non-reasoning, High Effort)",
       "GPT Luna (high)",
     ]);
   });
@@ -230,6 +230,7 @@ describe("getReasoningVariantGroups", () => {
       { ...model("qwen-max", 40, 0.2), name: "Qwen Max" },
       { ...model("qwen-high", 42, 0.3), name: "Qwen High" },
       { ...model("dated", 44, 0.4), name: "Qwen (Dec)" },
+      { ...model("context", 46, 0.5), name: "Qwen (High Context)" },
     ];
 
     expect(getReasoningVariantGroups(models)).toEqual([]);
@@ -261,6 +262,36 @@ describe("getReasoningVariantGroups", () => {
     expect(result[0].models.map((item) => item.id)).toEqual([
       "deepseek-high",
       "deepseek-max",
+    ]);
+  });
+
+  it("matches reasoning levels independently of other parenthesized details", () => {
+    const models = [
+      {
+        ...model("claude-opus-5-low", 50.6, 0.4263),
+        name: "Claude Opus 5 (Adaptive Reasoning, Low Effort)",
+        creator: "Anthropic",
+      },
+      {
+        ...model("claude-opus-5-medium", 56.3, 0.7224),
+        name: "Claude Opus 5 (Adaptive Reasoning, Medium Effort)",
+        creator: "Anthropic",
+      },
+      {
+        ...model("claude-opus-5-max-preview", 60.7, 2.3365),
+        name: "Claude Opus 5 (Adaptive Reasoning, Max Effort, Preview)",
+        creator: "Anthropic",
+      },
+    ];
+
+    const result = getReasoningVariantGroups(models);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].baseName).toBe("Claude Opus 5");
+    expect(result[0].models.map((item) => item.id)).toEqual([
+      "claude-opus-5-low",
+      "claude-opus-5-medium",
+      "claude-opus-5-max-preview",
     ]);
   });
 });
