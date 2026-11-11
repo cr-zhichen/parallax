@@ -38,11 +38,10 @@ interface ApiModel {
     price_1m_input_tokens?: number | null;
     price_1m_output_tokens?: number | null;
   };
-  performance?: {
-    median_output_tokens_per_second?: number | null;
-    median_time_to_first_answer_token_seconds?: number | null;
-    median_time_to_first_token_seconds?: number | null;
-  };
+  performance_v3?: {
+    mean_output_tokens_per_second?: number | null;
+    mean_time_to_first_token_seconds?: number | null;
+  } | null;
 }
 
 interface ApiEnvelope {
@@ -134,11 +133,10 @@ function normalizeModel(model: ApiModel): ModelPoint {
         ? (inputPrice * 3 + outputPrice) / 4
         : null),
     outputSpeed: finiteOrNull(
-      model.performance?.median_output_tokens_per_second,
+      model.performance_v3?.mean_output_tokens_per_second,
     ),
     latency: finiteOrNull(
-      model.performance?.median_time_to_first_answer_token_seconds ??
-        model.performance?.median_time_to_first_token_seconds,
+      model.performance_v3?.mean_time_to_first_token_seconds,
     ),
   };
 }
